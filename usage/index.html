@@ -1,0 +1,34 @@
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Stream BLOb</title>
+
+    </head>
+<body>
+
+<h1>
+    Stream BLOB
+</h1>
+<input id="option_width" value="480"> ×
+<input id="option_height" value="360">
+<br>
+<label for="option_url">RTMP address:</label>
+<input id="option_url" value="rtmp://185.22.60.96:1935/encoder/123151" style="width: 500px">
+<br>
+<label for="option_server_url">Server URL:</label>
+<input id="option_server_url" value="http://localhost:8000" style="width: 500px">
+<br>
+<button id="button_start">Start streaming</button>
+<hr>
+<div>
+    <p id="output_message"></p>
+    <video id="output_video" autoplay="true"></video>
+</div>
+<hr>
+<textarea readonly="true" id="output_console" cols="91" rows="5"></textarea>
+
+<script src="socket.io.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>

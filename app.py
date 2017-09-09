@@ -1,55 +1,91 @@
 #! /usr/bin/env python3.6
-import argparse
 
-from asyncio import subprocess
+import argparse
+import logging
+from asyncio import get_event_loop
+
+import asyncio
+import socketio
+
 from aiohttp import web
+from subprocess import Popen, PIPE
+
+sio = socketio.AsyncServer()
+logger = logging.getLogger('transfer-logger')
 
 
 class Server:
-    def __init__(self, host: str=None, port:  int=None):
+    def __init__(self, host: str = None, port: int = None):
         assert isinstance(host, str)
         assert isinstance(port, int)
 
         self.host = host
         self.port = port
+        self.ffmpeg_processes = {}
+        self.loop = get_event_loop()
 
     def run(self):
+        logger.info(f'Run server on {self.host}:{self.port}')
         self.check_ffmpeg()
 
-        app = web.Application()
-        app['websockets'] = []
+        self.app = web.Application(loop=self.loop)
+        self.app['websockets'] = []
 
-        app.router.add_route('GET', '/', self.transfer_socket)
-        app.on_shutdown.append(self.on_shutdown)
-        web.run_app(app, host=self.host, port=self.port)
-
-    def transfer_socket(self):
-        pass
-
-    @classmethod
-    async def on_shutdown(cls, app):
-        for ws in app['websockets']:
-            await ws.close(code=1001, message='Stop socket')
+        sio.attach(self.app)
+        web.run_app(self.app, host=self.host, port=self.port)
 
     @staticmethod
-    async def check_ffmpeg():
+    def check_ffmpeg():
+        logger.info('Check ffmpeg  ... ')
         command = 'ffmpeg -h'
-        status_code = await subprocess.create_subprocess_exec(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        proc = Popen(command, shell=True, stdout=PIPE, stderr=PIPE)
+        proc.wait()
 
-        assert status_code == 0
+        assert proc.returncode == 0, 'ffmpeg is not installed'
+
+    @staticmethod
+    def parse_args():
+        parser = argparse.ArgumentParser()
+        parser.add_argument('host', type=str, help='running host')
+        parser.add_argument('port', type=int, help='running port')
+
+        args = parser.parse_args()
+
+        return args.host, args.port
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('host', type=str, help='running host')
-    parser.add_argument('port', type=int, help='running port')
+@sio.on('start')
+async def connect(key, rtmp_url):
+    print("connect ")
+    options = [
+        'ffmpeg', '-vcodec', 'libvpx', '-i', '-',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
+        '-an', '-bufsize', '1000', '-f', 'flv', rtmp_url
+    ]
 
-    args = parser.parse_args()
+    server.ffmpeg_processes[key] = await asyncio.create_subprocess_exec(
+        ' '.join(options), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE
+    )
 
-    return args.host, args.port
+
+@sio.on('binarystream')
+async def message(key, data):
+    print("message ")
+    if key in server.ffmpeg_processes:
+        await server.ffmpeg_processes[key].stdin.write(data)
+
+
+@sio.on('disconnect')
+async def disconnect(key):
+    print('disconnect ')
+    if key in server.ffmpeg_processes:
+        server.ffmpeg_processes[key].terminate()
+        await server.ffmpeg_processes[key].wait()
+        del server.ffmpeg_processes[key]
+
 
 if __name__ == '__main__':
-    server = Server(*parse_args())
+    args = Server.parse_args()
+
+    server = Server(*args)
     server.run()
