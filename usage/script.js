@@ -12,7 +12,7 @@ var output_console = document.getElementById('output_console'),
     button_start = document.getElementById('button_start'),
     height = option_height.value,
     width = option_width.value,
-    url = option_url.value = 'rtmp://' + location.host.split(':')[0] + ':1935/encode/124152351',
+    url = option_url.value,
     server_url = option_server_url.value = 'http://' + location.host.split(':')[0] + ':8000';
 
 option_height.onchange = option_height.onkeyup = function () {
@@ -90,7 +90,7 @@ function onSuccess(stream) {
     };
 
     mediaRecorder.ondataavailable = function (e) {
-        socket.emit("binarystream", e.data);
+        socket.emit("stream", e.data);
     }
 }
 
